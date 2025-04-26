@@ -2,7 +2,7 @@ package pwm
 
 import (
 	"errors"
-	"sync"
+	"fmt"
 	"time"
 )
 
@@ -19,18 +19,14 @@ const (
 )
 
 type PWM struct {
-	pin     pin
-	started bool
-	done    chan struct{}
-	wg      *sync.WaitGroup
+	pin  pin
+	done chan struct{}
 }
 
 func NewPWM(pin pin) *PWM {
 	return &PWM{
-		pin:     pin,
-		started: false,
-		done:    make(chan struct{}),
-		wg:      new(sync.WaitGroup),
+		pin:  pin,
+		done: make(chan struct{}),
 	}
 }
 
@@ -40,63 +36,68 @@ func (p *PWM) Start(dutyCycle uint, frequency uint) error {
 		return err
 	}
 
-	p.Stop()
+	period := time.Second / time.Duration(frequency)
+
+	return p.work(period, dutyCycle)
+}
+
+func (p *PWM) Stop() {
+	p.done <- struct{}{}
+}
+
+func (p *PWM) work(period time.Duration, dutyCycle uint) (err error) {
+	highDuration := (period * time.Duration(dutyCycle)) / time.Duration(100)
+	lowDuration := period - highDuration
+
+	defer func() {
+		err = p.pin.Out(Low)
+		err = p.pin.Halt()
+		fmt.Println("PWM stopped")
+	}()
+
+	level := Low
+	edgeCase := false
+	if dutyCycle == 0 {
+		edgeCase = true
+		level = Low
+
+	}
 
 	if dutyCycle == 100 {
-		err = p.pin.Out(High)
+		edgeCase = true
+		level = High
+	}
+
+	if edgeCase {
+		err := p.pin.Out(level)
 		if err != nil {
 			return err
 		}
 
+		<-p.done
+
 		return nil
 	}
 
-	if dutyCycle == 0 {
+	for {
+		err := p.pin.Out(High)
+		if err != nil {
+			return err
+		}
+		time.Sleep(highDuration)
+
 		err = p.pin.Out(Low)
 		if err != nil {
 			return err
 		}
+		time.Sleep(lowDuration)
 
-		return nil
-	}
-
-	period := time.Second / time.Duration(frequency)
-	p.work(period, dutyCycle)
-
-	return nil
-}
-
-func (p *PWM) Stop() {
-	if p.started {
-		p.done <- struct{}{}
-	}
-
-	p.wg.Wait()
-}
-
-func (p *PWM) work(period time.Duration, dutyCycle uint) {
-	ticker := time.NewTicker(period)
-
-	p.wg.Add(1)
-	p.started = true
-	go func() {
-		defer func() {
-			ticker.Stop()
-			_ = p.pin.Halt()
-			p.started = false
-			p.wg.Done()
-		}()
-		for {
-			select {
-			case <-ticker.C:
-				_ = p.pin.Out(High)
-				time.Sleep((period * time.Duration(dutyCycle)) / time.Duration(100))
-				_ = p.pin.Out(Low)
-			case <-p.done:
-				return
-			}
+		select {
+		case <-p.done:
+			return nil
+		default:
 		}
-	}()
+	}
 }
 
 func (p *PWM) validate(dutyCycle uint, frequency uint) error {

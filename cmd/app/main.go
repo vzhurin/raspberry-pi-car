@@ -41,19 +41,16 @@ func main() {
 		log.Fatal(err)
 	}
 
-	err = pwmController.Start(5, 50)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	time.Sleep(5 * time.Second)
-
-	err = pwmController.Start(10, 50)
-	if err != nil {
-		log.Fatal(err)
-	}
+	go func() {
+		err = pwmController.Start(100, 50)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}()
 
 	time.Sleep(5 * time.Second)
 
 	pwmController.Stop()
+
+	time.Sleep(2 * time.Second)
 }
