@@ -22,3 +22,7 @@ func (p *Pin) Out(level pwm.Level) error {
 
 	return p.pin.Out(gpio.Low)
 }
+
+func (p *Pin) Halt() error {
+	return p.pin.Halt()
+}

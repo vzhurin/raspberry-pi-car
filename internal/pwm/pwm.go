@@ -8,6 +8,7 @@ import (
 
 type pin interface {
 	Out(level Level) error
+	Halt() error
 }
 
 type Level bool
@@ -42,13 +43,19 @@ func (p *PWM) Start(dutyCycle uint, frequency uint) error {
 	p.Stop()
 
 	if dutyCycle == 100 {
-		_ = p.pin.Out(High)
+		err = p.pin.Out(High)
+		if err != nil {
+			return err
+		}
 
 		return nil
 	}
 
 	if dutyCycle == 0 {
-		_ = p.pin.Out(Low)
+		err = p.pin.Out(Low)
+		if err != nil {
+			return err
+		}
 
 		return nil
 	}
@@ -63,8 +70,8 @@ func (p *PWM) Stop() {
 	if p.started {
 		p.done <- struct{}{}
 	}
+
 	p.wg.Wait()
-	_ = p.pin.Out(Low)
 }
 
 func (p *PWM) work(period time.Duration, dutyCycle uint) {
@@ -75,7 +82,7 @@ func (p *PWM) work(period time.Duration, dutyCycle uint) {
 	go func() {
 		defer func() {
 			ticker.Stop()
-			_ = p.pin.Out(Low)
+			_ = p.pin.Halt()
 			p.started = false
 			p.wg.Done()
 		}()
