@@ -3,27 +3,16 @@ package pwm
 import (
 	"errors"
 	"fmt"
+	"raspberry-pi-car/internal/pin"
 	"time"
 )
 
-type pin interface {
-	Out(level Level) error
-	Halt() error
-}
-
-type Level bool
-
-const (
-	High Level = true
-	Low  Level = false
-)
-
 type PWM struct {
-	pin  pin
+	pin  pin.Pin
 	done chan struct{}
 }
 
-func NewPWM(pin pin) *PWM {
+func NewPWM(pin pin.Pin) *PWM {
 	return &PWM{
 		pin:  pin,
 		done: make(chan struct{}),
@@ -38,63 +27,52 @@ func (p *PWM) Start(dutyCycle uint, frequency uint) error {
 
 	period := time.Second / time.Duration(frequency)
 
-	return p.work(period, dutyCycle)
+	go p.work(period, dutyCycle)
+
+	return nil
 }
 
 func (p *PWM) Stop() {
 	p.done <- struct{}{}
 }
 
-func (p *PWM) work(period time.Duration, dutyCycle uint) (err error) {
+func (p *PWM) work(period time.Duration, dutyCycle uint) {
 	highDuration := (period * time.Duration(dutyCycle)) / time.Duration(100)
 	lowDuration := period - highDuration
 
 	defer func() {
-		err = p.pin.Out(Low)
-		err = p.pin.Halt()
-		fmt.Println("PWM stopped")
+		_ = p.pin.Out(pin.Low)
 	}()
 
-	level := Low
 	edgeCase := false
+	level := pin.Low
 	if dutyCycle == 0 {
 		edgeCase = true
-		level = Low
-
-	}
-
-	if dutyCycle == 100 {
+		level = pin.Low
+	} else if dutyCycle == 100 {
 		edgeCase = true
-		level = High
+		level = pin.High
 	}
 
 	if edgeCase {
-		err := p.pin.Out(level)
-		if err != nil {
-			return err
-		}
-
+		_ = p.pin.Out(level)
+		fmt.Println("DONE")
 		<-p.done
+		fmt.Println("DONE DONE")
 
-		return nil
+		return
 	}
 
 	for {
-		err := p.pin.Out(High)
-		if err != nil {
-			return err
-		}
+		_ = p.pin.Out(pin.High)
 		time.Sleep(highDuration)
 
-		err = p.pin.Out(Low)
-		if err != nil {
-			return err
-		}
+		_ = p.pin.Out(pin.Low)
 		time.Sleep(lowDuration)
 
 		select {
 		case <-p.done:
-			return nil
+			return
 		default:
 		}
 	}
