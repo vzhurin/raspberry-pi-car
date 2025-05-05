@@ -4,6 +4,7 @@ import (
 	"log"
 	"periph.io/x/conn/v3/gpio/gpioreg"
 	"periph.io/x/host/v3"
+	"raspberry-pi-car/internal/chassis"
 	"raspberry-pi-car/internal/periph"
 	"raspberry-pi-car/internal/pwm"
 	"time"
@@ -35,7 +36,7 @@ func main() {
 	if pwmPinLeft == nil {
 		log.Fatal("Failed to find GPIO19")
 	}
-	//pwmControllerLeft := pwm.NewPWM(periph.NewPin(pwmPinLeft))
+	pwmControllerLeft := pwm.NewPWM(periph.NewPin(pwmPinLeft))
 
 	controlPinLeft1 := gpioreg.ByName("GPIO2")
 	if controlPinLeft1 == nil {
@@ -47,20 +48,14 @@ func main() {
 		log.Fatal("Failed to find GPIO3")
 	}
 
-	pwmControllerRight.Start(99, 50)
-	//pwmControllerLeft.Start(100, 50)
-	time.Sleep(15 * time.Second)
-	pwmControllerRight.Stop()
-	//pwmControllerLeft.Stop()
+	ch := chassis.NewChassis(
+		pwmControllerRight,
+		pwmControllerLeft,
+		periph.NewPin(controlPinRight1),
+		periph.NewPin(controlPinRight2),
+		periph.NewPin(controlPinLeft1),
+		periph.NewPin(controlPinLeft2),
+	)
 
-	//ch := chassis.NewChassis(
-	//	pwmControllerRight,
-	//	pwmControllerLeft,
-	//	periph.NewPin(controlPinRight1),
-	//	periph.NewPin(controlPinRight2),
-	//	periph.NewPin(controlPinLeft1),
-	//	periph.NewPin(controlPinLeft2),
-	//)
-	//
-	//_ = ch.Move(100, 100, 10*time.Second)
+	_ = ch.Move(100, 100, 3*time.Second)
 }

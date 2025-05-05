@@ -116,5 +116,8 @@ func (c *Chassis) move(left int, right int, duration time.Duration) error {
 	c.pwmRight.Stop()
 	c.pwmLeft.Stop()
 
+	// TODO Remove
+	time.Sleep(time.Second)
+
 	return nil
 }

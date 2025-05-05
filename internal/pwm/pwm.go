@@ -2,7 +2,6 @@ package pwm
 
 import (
 	"errors"
-	"fmt"
 	"raspberry-pi-car/internal/pin"
 	"time"
 )
@@ -56,9 +55,7 @@ func (p *PWM) work(period time.Duration, dutyCycle uint) {
 
 	if edgeCase {
 		_ = p.pin.Out(level)
-		fmt.Println("DONE")
 		<-p.done
-		fmt.Println("DONE DONE")
 
 		return
 	}
