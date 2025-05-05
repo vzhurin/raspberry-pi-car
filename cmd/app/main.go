@@ -57,5 +57,9 @@ func main() {
 		periph.NewPin(controlPinLeft2),
 	)
 
-	_ = ch.Move(100, 100, 3*time.Second)
+	_ = ch.Move(0.3, -0.3, 1*time.Second)
+
+	//_ = ch.Move(0.5, 0.5, 3*time.Second)
+	//
+	//_ = ch.Move(1, 1, 3*time.Second)
 }

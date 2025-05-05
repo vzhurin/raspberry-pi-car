@@ -2,7 +2,7 @@ package chassis
 
 import (
 	"errors"
-	"raspberry-pi-car/internal/helper"
+	"math"
 	"raspberry-pi-car/internal/pin"
 	"raspberry-pi-car/internal/pwm"
 	"time"
@@ -39,16 +39,16 @@ func NewChassis(
 	}
 }
 
-func (c *Chassis) Move(left int, right int, duration time.Duration) error {
-	if left < -100 || right < -100 || left > 100 || right > 100 {
-		return errors.New("left and right values must be in the range from -100 to 100 inclusive")
+func (c *Chassis) Move(rightDutyCycle float64, leftDutyCycle float64, duration time.Duration) error {
+	if rightDutyCycle < -1 || rightDutyCycle > 1 || leftDutyCycle < -1 || leftDutyCycle > 1 {
+		return errors.New("rightDutyCycle and leftDutyCycle values must be in the range from -1 to 1 inclusive")
 	}
 
-	return c.move(left, right, duration)
+	return c.move(rightDutyCycle, leftDutyCycle, duration)
 }
 
-func (c *Chassis) move(left int, right int, duration time.Duration) error {
-	if right > 0 {
+func (c *Chassis) move(rightDutyCycle float64, leftDutyCycle float64, duration time.Duration) error {
+	if rightDutyCycle > 0 {
 		err := c.controlPinRight1.Out(pin.Low)
 		if err != nil {
 			return err
@@ -70,7 +70,7 @@ func (c *Chassis) move(left int, right int, duration time.Duration) error {
 		}
 	}
 
-	if left > 0 {
+	if leftDutyCycle > 0 {
 		err := c.controlPinLeft1.Out(pin.High)
 		if err != nil {
 			return err
@@ -92,32 +92,20 @@ func (c *Chassis) move(left int, right int, duration time.Duration) error {
 		}
 	}
 
-	rightWorker := func(errChan chan<- error) {
-		errChan <- c.pwmRight.Start(uint(helper.Abs(right)), pwmFreq)
+	err := c.pwmRight.Start(math.Abs(rightDutyCycle), pwmFreq)
+	if err != nil {
+		return err
 	}
 
-	leftWorker := func(errChan chan<- error) {
-		errChan <- c.pwmLeft.Start(uint(helper.Abs(left)), pwmFreq)
-	}
-
-	errChan := make(chan error)
-
-	go rightWorker(errChan)
-	go leftWorker(errChan)
-
-	for i := 0; i < 2; i++ {
-		if err := <-errChan; err != nil {
-			return err
-		}
+	err = c.pwmLeft.Start(math.Abs(leftDutyCycle), pwmFreq)
+	if err != nil {
+		return err
 	}
 
 	time.Sleep(duration)
 
 	c.pwmRight.Stop()
 	c.pwmLeft.Stop()
-
-	// TODO Remove
-	time.Sleep(time.Second)
 
 	return nil
 }

@@ -3,62 +3,50 @@ package pwm
 import (
 	"errors"
 	"raspberry-pi-car/internal/pin"
+	"sync"
 	"time"
 )
 
 type PWM struct {
 	pin  pin.Pin
 	done chan struct{}
+	wg   sync.WaitGroup
 }
 
 func NewPWM(pin pin.Pin) *PWM {
 	return &PWM{
 		pin:  pin,
 		done: make(chan struct{}),
+		wg:   sync.WaitGroup{},
 	}
 }
 
-func (p *PWM) Start(dutyCycle uint, frequency uint) error {
+func (p *PWM) Start(dutyCycle float64, frequency float64) error {
 	err := p.validate(dutyCycle, frequency)
 	if err != nil {
 		return err
 	}
 
-	period := time.Second / time.Duration(frequency)
+	period := time.Duration(float64(time.Second) / frequency)
+	highDuration := time.Duration(float64(period) * dutyCycle)
+	lowDuration := period - highDuration
 
-	go p.work(period, dutyCycle)
+	p.wg.Add(1)
+	go p.work(highDuration, lowDuration)
 
 	return nil
 }
 
 func (p *PWM) Stop() {
 	p.done <- struct{}{}
+	p.wg.Wait()
 }
 
-func (p *PWM) work(period time.Duration, dutyCycle uint) {
-	highDuration := (period * time.Duration(dutyCycle)) / time.Duration(100)
-	lowDuration := period - highDuration
-
+func (p *PWM) work(highDuration, lowDuration time.Duration) {
 	defer func() {
 		_ = p.pin.Out(pin.Low)
+		p.wg.Done()
 	}()
-
-	edgeCase := false
-	level := pin.Low
-	if dutyCycle == 0 {
-		edgeCase = true
-		level = pin.Low
-	} else if dutyCycle == 100 {
-		edgeCase = true
-		level = pin.High
-	}
-
-	if edgeCase {
-		_ = p.pin.Out(level)
-		<-p.done
-
-		return
-	}
 
 	for {
 		_ = p.pin.Out(pin.High)
@@ -75,17 +63,13 @@ func (p *PWM) work(period time.Duration, dutyCycle uint) {
 	}
 }
 
-func (p *PWM) validate(dutyCycle uint, frequency uint) error {
-	if dutyCycle > 100 {
-		return errors.New("duty cycle must not be more than 100")
+func (p *PWM) validate(dutyCycle float64, frequency float64) error {
+	if dutyCycle < 0 || dutyCycle > 1 {
+		return errors.New("duty cycle must be in the range from 0 to 1 inclusive")
 	}
 
-	if frequency == 0 {
-		return errors.New("frequency must not be zero")
-	}
-
-	if time.Second/time.Duration(frequency) == 0 {
-		return errors.New("frequency is too high")
+	if frequency <= 0 {
+		return errors.New("frequency must be greater than zero")
 	}
 
 	return nil
