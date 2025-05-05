@@ -1,65 +1,16 @@
 package main
 
 import (
-	"log"
-	"periph.io/x/conn/v3/gpio/gpioreg"
-	"periph.io/x/host/v3"
-	"raspberry-pi-car/internal/chassis"
-	"raspberry-pi-car/internal/periph"
-	"raspberry-pi-car/internal/pwm"
-	"time"
+	"fmt"
+	"raspberry-pi-car/config"
+	"raspberry-pi-car/internal/app"
 )
 
 func main() {
-	_, err := host.Init()
+	cfg, err := config.Init()
 	if err != nil {
-		log.Fatal(err)
+		fmt.Println(err) // TODO logger
 	}
 
-	pwmPinRight := gpioreg.ByName("GPIO18")
-	if pwmPinRight == nil {
-		log.Fatal("Failed to find GPIO18")
-	}
-	pwmControllerRight := pwm.NewPWM(periph.NewPin(pwmPinRight))
-
-	controlPinRight1 := gpioreg.ByName("GPIO0")
-	if controlPinRight1 == nil {
-		log.Fatal("Failed to find GPIO0")
-	}
-
-	controlPinRight2 := gpioreg.ByName("GPIO1")
-	if controlPinRight2 == nil {
-		log.Fatal("Failed to find GPIO1")
-	}
-
-	pwmPinLeft := gpioreg.ByName("GPIO19")
-	if pwmPinLeft == nil {
-		log.Fatal("Failed to find GPIO19")
-	}
-	pwmControllerLeft := pwm.NewPWM(periph.NewPin(pwmPinLeft))
-
-	controlPinLeft1 := gpioreg.ByName("GPIO2")
-	if controlPinLeft1 == nil {
-		log.Fatal("Failed to find GPIO2")
-	}
-
-	controlPinLeft2 := gpioreg.ByName("GPIO3")
-	if controlPinLeft2 == nil {
-		log.Fatal("Failed to find GPIO3")
-	}
-
-	ch := chassis.NewChassis(
-		pwmControllerRight,
-		pwmControllerLeft,
-		periph.NewPin(controlPinRight1),
-		periph.NewPin(controlPinRight2),
-		periph.NewPin(controlPinLeft1),
-		periph.NewPin(controlPinLeft2),
-	)
-
-	_ = ch.Move(0.3, -0.3, 1*time.Second)
-
-	//_ = ch.Move(0.5, 0.5, 3*time.Second)
-	//
-	//_ = ch.Move(1, 1, 3*time.Second)
+	app.Run(app.NewContainer(cfg))
 }

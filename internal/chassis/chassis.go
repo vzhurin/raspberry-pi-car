@@ -3,10 +3,13 @@ package chassis
 import (
 	"errors"
 	"math"
-	"raspberry-pi-car/internal/pin"
 	"raspberry-pi-car/internal/pwm"
 	"time"
 )
+
+type pin interface {
+	Out(bool) error
+}
 
 const pwmFreq = 100
 
@@ -14,20 +17,20 @@ type Chassis struct {
 	pwmRight *pwm.PWM
 	pwmLeft  *pwm.PWM
 
-	controlPinRight1 pin.Pin
-	controlPinRight2 pin.Pin
+	controlPinRight1 pin
+	controlPinRight2 pin
 
-	controlPinLeft1 pin.Pin
-	controlPinLeft2 pin.Pin
+	controlPinLeft1 pin
+	controlPinLeft2 pin
 }
 
 func NewChassis(
 	pwmRight *pwm.PWM,
 	pwmLeft *pwm.PWM,
-	controlPinRight1 pin.Pin,
-	controlPinRight2 pin.Pin,
-	controlPinLeft1 pin.Pin,
-	controlPinLeft2 pin.Pin,
+	controlPinRight1 pin,
+	controlPinRight2 pin,
+	controlPinLeft1 pin,
+	controlPinLeft2 pin,
 ) *Chassis {
 	return &Chassis{
 		pwmRight:         pwmRight,
@@ -49,44 +52,44 @@ func (c *Chassis) Move(rightDutyCycle float64, leftDutyCycle float64, duration t
 
 func (c *Chassis) move(rightDutyCycle float64, leftDutyCycle float64, duration time.Duration) error {
 	if rightDutyCycle > 0 {
-		err := c.controlPinRight1.Out(pin.Low)
+		err := c.controlPinRight1.Out(false)
 		if err != nil {
 			return err
 		}
 
-		err = c.controlPinRight2.Out(pin.High)
+		err = c.controlPinRight2.Out(true)
 		if err != nil {
 			return err
 		}
 	} else {
-		err := c.controlPinRight1.Out(pin.High)
+		err := c.controlPinRight1.Out(true)
 		if err != nil {
 			return err
 		}
 
-		err = c.controlPinRight2.Out(pin.Low)
+		err = c.controlPinRight2.Out(false)
 		if err != nil {
 			return err
 		}
 	}
 
 	if leftDutyCycle > 0 {
-		err := c.controlPinLeft1.Out(pin.High)
+		err := c.controlPinLeft1.Out(true)
 		if err != nil {
 			return err
 		}
 
-		err = c.controlPinLeft2.Out(pin.Low)
+		err = c.controlPinLeft2.Out(false)
 		if err != nil {
 			return err
 		}
 	} else {
-		err := c.controlPinLeft1.Out(pin.Low)
+		err := c.controlPinLeft1.Out(false)
 		if err != nil {
 			return err
 		}
 
-		err = c.controlPinLeft2.Out(pin.High)
+		err = c.controlPinLeft2.Out(true)
 		if err != nil {
 			return err
 		}

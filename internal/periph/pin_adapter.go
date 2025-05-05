@@ -2,7 +2,6 @@ package periph
 
 import (
 	"periph.io/x/conn/v3/gpio"
-	"raspberry-pi-car/internal/pin"
 )
 
 type Pin struct {
@@ -15,8 +14,8 @@ func NewPin(pin gpio.PinOut) *Pin {
 	}
 }
 
-func (p *Pin) Out(level pin.Level) error {
-	if level == pin.High {
+func (p *Pin) Out(level bool) error {
+	if level == true {
 		return p.pin.Out(gpio.High)
 	}
 

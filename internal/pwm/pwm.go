@@ -2,18 +2,21 @@ package pwm
 
 import (
 	"errors"
-	"raspberry-pi-car/internal/pin"
 	"sync"
 	"time"
 )
 
+type pin interface {
+	Out(bool) error
+}
+
 type PWM struct {
-	pin  pin.Pin
+	pin  pin
 	done chan struct{}
 	wg   sync.WaitGroup
 }
 
-func NewPWM(pin pin.Pin) *PWM {
+func NewPWM(pin pin) *PWM {
 	return &PWM{
 		pin:  pin,
 		done: make(chan struct{}),
@@ -44,15 +47,15 @@ func (p *PWM) Stop() {
 
 func (p *PWM) work(highDuration, lowDuration time.Duration) {
 	defer func() {
-		_ = p.pin.Out(pin.Low)
+		_ = p.pin.Out(false)
 		p.wg.Done()
 	}()
 
 	for {
-		_ = p.pin.Out(pin.High)
+		_ = p.pin.Out(true)
 		time.Sleep(highDuration)
 
-		_ = p.pin.Out(pin.Low)
+		_ = p.pin.Out(false)
 		time.Sleep(lowDuration)
 
 		select {
