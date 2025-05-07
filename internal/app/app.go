@@ -1,13 +1,15 @@
 package app
 
 import (
-	"fmt"
+	"log/slog"
 	"os"
 	"os/signal"
 	"syscall"
 )
 
 func Run(c *Container) {
+	logger := c.Logger().With(slog.String("where", "app"))
+	
 	c.HTTPServer().Run()
 
 	// TODO check
@@ -16,14 +18,14 @@ func Run(c *Container) {
 
 	select {
 	case <-quit:
-		fmt.Println("signal received, shutting down") // TODO logger
+		logger.Info("shutdown signal received")
 	case err := <-c.HTTPServer().ErrNotify():
-		fmt.Println("http server error:", err) // TODO logger
+		logger.Error("http server error", slog.Any("error", err))
 	}
 
-	fmt.Println("shutting down")
+	logger.Info("shutting down")
 
 	if err := c.HTTPServer().Shutdown(); err != nil {
-		fmt.Println("http server shutdown error :", err) // TODO logger
+		logger.Error("http server shutdown error", slog.Any("error", err))
 	}
 }

@@ -24,7 +24,7 @@ func NewPWM(pin pin) *PWM {
 	}
 }
 
-func (p *PWM) Start(dutyCycle float64, frequency float64) error {
+func (p *PWM) Start(dutyCycle float64, frequency float64, errChan chan<- error) error {
 	err := p.validate(dutyCycle, frequency)
 	if err != nil {
 		return err
@@ -35,7 +35,7 @@ func (p *PWM) Start(dutyCycle float64, frequency float64) error {
 	lowDuration := period - highDuration
 
 	p.wg.Add(1)
-	go p.work(highDuration, lowDuration)
+	go p.work(highDuration, lowDuration, errChan)
 
 	return nil
 }
@@ -45,17 +45,26 @@ func (p *PWM) Stop() {
 	p.wg.Wait()
 }
 
-func (p *PWM) work(highDuration, lowDuration time.Duration) {
+func (p *PWM) work(highDuration, lowDuration time.Duration, errChan chan<- error) {
 	defer func() {
-		_ = p.pin.Out(false)
+		err := p.pin.Out(false)
+		if err != nil {
+			errChan <- err
+		}
 		p.wg.Done()
 	}()
 
 	for {
-		_ = p.pin.Out(true)
+		err := p.pin.Out(true)
+		if err != nil {
+			errChan <- err
+		}
 		time.Sleep(highDuration)
 
-		_ = p.pin.Out(false)
+		err = p.pin.Out(false)
+		if err != nil {
+			errChan <- err
+		}
 		time.Sleep(lowDuration)
 
 		select {

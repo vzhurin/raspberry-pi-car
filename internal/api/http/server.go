@@ -2,8 +2,8 @@ package http
 
 import (
 	"context"
-	"fmt"
 	"github.com/gin-gonic/gin"
+	"log/slog"
 	"net/http"
 	"time"
 )
@@ -11,6 +11,7 @@ import (
 type Server struct {
 	server    *http.Server
 	errNotify chan error
+	logger    *slog.Logger
 }
 
 type Config struct {
@@ -20,7 +21,7 @@ type Config struct {
 	GinMode string
 }
 
-func NewServer(cfg *Config, handler *Handler) (*Server, error) {
+func NewServer(cfg *Config, handler *Handler, logger *slog.Logger) (*Server, error) {
 	if cfg.GinMode == "release" {
 		gin.SetMode(gin.ReleaseMode)
 	}
@@ -37,6 +38,7 @@ func NewServer(cfg *Config, handler *Handler) (*Server, error) {
 	return &Server{
 		server:    server,
 		errNotify: make(chan error, 1), // TODO check
+		logger:    logger,
 	}, nil
 }
 
@@ -59,8 +61,7 @@ func (s *Server) Shutdown() error {
 		return err
 	}
 
-	// TODO logger
-	fmt.Println("Server shutdown complete")
+	s.logger.With(slog.String("where", "http server")).Info("http server shutdown complete")
 
 	return nil
 }

@@ -3,7 +3,6 @@ package chassis
 import (
 	"errors"
 	"math"
-	"raspberry-pi-car/internal/pwm"
 	"time"
 )
 
@@ -11,43 +10,53 @@ type pin interface {
 	Out(bool) error
 }
 
-const pwmFreq = 100
+type pwm interface {
+	Start(dutyCycle float64, frequency float64, errChan chan<- error) error
+	Stop()
+}
 
 type Chassis struct {
-	pwmRight *pwm.PWM
-	pwmLeft  *pwm.PWM
+	pwmControllerRight pwm
+	pwmControllerLeft  pwm
 
 	controlPinRight1 pin
 	controlPinRight2 pin
 
 	controlPinLeft1 pin
 	controlPinLeft2 pin
+
+	pwmFrequency float64
+	moveDuration time.Duration
 }
 
 func NewChassis(
-	pwmRight *pwm.PWM,
-	pwmLeft *pwm.PWM,
+	pwmControllerRight pwm,
+	pwmControllerLeft pwm,
 	controlPinRight1 pin,
 	controlPinRight2 pin,
 	controlPinLeft1 pin,
 	controlPinLeft2 pin,
+	pwmFrequency float64,
+	moveDuration time.Duration,
 ) *Chassis {
 	return &Chassis{
-		pwmRight:         pwmRight,
-		pwmLeft:          pwmLeft,
-		controlPinRight1: controlPinRight1,
-		controlPinRight2: controlPinRight2,
-		controlPinLeft1:  controlPinLeft1,
-		controlPinLeft2:  controlPinLeft2,
+		pwmControllerRight: pwmControllerRight,
+		pwmControllerLeft:  pwmControllerLeft,
+		controlPinRight1:   controlPinRight1,
+		controlPinRight2:   controlPinRight2,
+		controlPinLeft1:    controlPinLeft1,
+		controlPinLeft2:    controlPinLeft2,
+		pwmFrequency:       pwmFrequency,
+		moveDuration:       moveDuration,
 	}
 }
 
-func (c *Chassis) Move(rightDutyCycle float64, leftDutyCycle float64, duration time.Duration) error {
+func (c *Chassis) Move(rightDutyCycle float64, leftDutyCycle float64) error {
 	if rightDutyCycle < -1 || rightDutyCycle > 1 || leftDutyCycle < -1 || leftDutyCycle > 1 {
 		return errors.New("rightDutyCycle and leftDutyCycle values must be in the range from -1 to 1 inclusive")
 	}
 
-	return c.move(rightDutyCycle, leftDutyCycle, duration)
+	return c.move(rightDutyCycle, leftDutyCycle, c.moveDuration)
 }
 
 func (c *Chassis) move(rightDutyCycle float64, leftDutyCycle float64, duration time.Duration) error {
@@ -95,20 +104,30 @@ func (c *Chassis) move(rightDutyCycle float64, leftDutyCycle float64, duration t
 		}
 	}
 
-	err := c.pwmRight.Start(math.Abs(rightDutyCycle), pwmFreq)
+	rightErrChan := make(chan error)
+	err := c.pwmControllerRight.Start(math.Abs(rightDutyCycle), c.pwmFrequency, rightErrChan)
 	if err != nil {
 		return err
 	}
 
-	err = c.pwmLeft.Start(math.Abs(leftDutyCycle), pwmFreq)
+	leftErrChan := make(chan error)
+	err = c.pwmControllerLeft.Start(math.Abs(leftDutyCycle), c.pwmFrequency, leftErrChan)
 	if err != nil {
 		return err
 	}
 
-	time.Sleep(duration)
+	timer := time.NewTimer(duration)
 
-	c.pwmRight.Stop()
-	c.pwmLeft.Stop()
+	select {
+	case err := <-rightErrChan:
+		return err
+	case err := <-leftErrChan:
+		return err
+	case <-timer.C:
+	}
+
+	c.pwmControllerRight.Stop()
+	c.pwmControllerLeft.Stop()
 
 	return nil
 }

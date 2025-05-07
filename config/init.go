@@ -6,6 +6,17 @@ type Config struct {
 	RESTHost string `mapstructure:"rest_host"`
 	RESTPort string `mapstructure:"rest_port"`
 	GinMode  string `mapstructure:"gin_mode"`
+
+	PWMPinRight      string `mapstructure:"pwm_pin_right"`
+	ControlPinRight1 string `mapstructure:"control_pin_right_1"`
+	ControlPinRight2 string `mapstructure:"control_pin_right_2"`
+
+	PWMPinLeft      string `mapstructure:"pwm_pin_left"`
+	ControlPinLeft1 string `mapstructure:"control_pin_left_1"`
+	ControlPinLeft2 string `mapstructure:"control_pin_left_2"`
+
+	PWMFrequency float64 `mapstructure:"pwm_frequency"`
+	MoveDuration int     `mapstructure:"move_duration"`
 }
 
 func Init() (*Config, error) {
