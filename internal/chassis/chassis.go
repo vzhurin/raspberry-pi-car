@@ -3,6 +3,7 @@ package chassis
 import (
 	"errors"
 	"math"
+	"sync"
 	"time"
 )
 
@@ -16,6 +17,7 @@ type pwm interface {
 }
 
 type Chassis struct {
+	mu                 sync.Mutex
 	pwmControllerRight pwm
 	pwmControllerLeft  pwm
 
@@ -52,6 +54,9 @@ func NewChassis(
 }
 
 func (c *Chassis) Move(rightDutyCycle float64, leftDutyCycle float64) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
 	if rightDutyCycle < -1 || rightDutyCycle > 1 || leftDutyCycle < -1 || leftDutyCycle > 1 {
 		return errors.New("rightDutyCycle and leftDutyCycle values must be in the range from -1 to 1 inclusive")
 	}
@@ -116,6 +121,11 @@ func (c *Chassis) move(rightDutyCycle float64, leftDutyCycle float64, duration t
 		return err
 	}
 
+	defer func() {
+		c.pwmControllerRight.Stop()
+		c.pwmControllerLeft.Stop()
+	}()
+
 	timer := time.NewTimer(duration)
 
 	select {
@@ -125,9 +135,6 @@ func (c *Chassis) move(rightDutyCycle float64, leftDutyCycle float64, duration t
 		return err
 	case <-timer.C:
 	}
-
-	c.pwmControllerRight.Stop()
-	c.pwmControllerLeft.Stop()
 
 	return nil
 }

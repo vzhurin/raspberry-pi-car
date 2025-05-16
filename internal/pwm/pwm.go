@@ -47,10 +47,7 @@ func (p *PWM) Stop() {
 
 func (p *PWM) work(highDuration, lowDuration time.Duration, errChan chan<- error) {
 	defer func() {
-		err := p.pin.Out(false)
-		if err != nil {
-			errChan <- err
-		}
+		_ = p.pin.Out(false)
 		p.wg.Done()
 	}()
 
@@ -58,12 +55,16 @@ func (p *PWM) work(highDuration, lowDuration time.Duration, errChan chan<- error
 		err := p.pin.Out(true)
 		if err != nil {
 			errChan <- err
+
+			return
 		}
 		time.Sleep(highDuration)
 
 		err = p.pin.Out(false)
 		if err != nil {
 			errChan <- err
+
+			return
 		}
 		time.Sleep(lowDuration)
 

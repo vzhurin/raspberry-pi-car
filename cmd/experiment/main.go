@@ -36,7 +36,7 @@ func main() {
 	if pwmPinLeft == nil {
 		log.Fatal("Failed to find GPIO19")
 	}
-	pwmControllerLeft := pwm.NewPWM(periph.NewPin(pwmPinLeft))
+	//pwmControllerLeft := pwm.NewPWM(periph.NewPin(pwmPinLeft))
 
 	controlPinLeft1 := gpioreg.ByName("GPIO2")
 	if controlPinLeft1 == nil {
@@ -48,16 +48,18 @@ func main() {
 		log.Fatal("Failed to find GPIO3")
 	}
 
-	ch := chassis.NewChassis(
-		pwmControllerRight,
-		pwmControllerLeft,
-		periph.NewPin(controlPinRight1),
-		periph.NewPin(controlPinRight2),
-		periph.NewPin(controlPinLeft1),
-		periph.NewPin(controlPinLeft2),
-	)
+	pwmControllerRight.Start()
 
-	_ = ch.Move(0.5, 0.5, 1*time.Second)
+	//ch := chassis.NewChassis(
+	//	pwmControllerRight,
+	//	pwmControllerLeft,
+	//	periph.NewPin(controlPinRight1),
+	//	periph.NewPin(controlPinRight2),
+	//	periph.NewPin(controlPinLeft1),
+	//	periph.NewPin(controlPinLeft2),
+	//)
+	//
+	//_ = ch.Move(0.5, 0.5, 1*time.Second)
 
 	//_ = ch.Move(0.5, 0.5, 3*time.Second)
 	//
