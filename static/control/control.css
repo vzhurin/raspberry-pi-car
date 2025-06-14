@@ -1,0 +1,15 @@
+#container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+}
+
+.range-vertical {
+    writing-mode: vertical-rl;
+}
+
+.range-control {
+    width: 300px;
+    height: 300px;
+}

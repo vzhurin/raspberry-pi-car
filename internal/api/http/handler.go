@@ -37,7 +37,7 @@ func (h *Handler) Move(c *gin.Context) {
 		return
 	}
 
-	err = h.mover.Move(request.RightDutyCycle, request.LeftDutyCycle)
+	err = h.mover.Move(*request.RightDutyCycle, *request.LeftDutyCycle)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, &ErrorResponse{Message: "internal server error"})
 		h.logger.Error("internal server error", slog.Any("error", err))
