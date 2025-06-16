@@ -1,42 +1,23 @@
 $(document).ready(function () {
-    speedCoefficient = 1
-    timeout = 100
+    let speedCoefficient = 0.4
+    let timeout = 100
+
+    let bfEl = $('#control-back-forward');
+    let lrEl = $('#control-left-right');
 
     setInterval(function (){
-        bfVal = Number($('#control-back-forward').val());
-        lrVal = Number($('#control-left-right').val());
+        let bfVal = Number(bfEl.val());
+        let lrVal = Number(lrEl.val());
 
         console.log({bf: bfVal, lr: lrVal})
 
-        lVal = rVal = (-bfVal / 100)
+        let lVal= (-bfVal / 100)
+        let rVal = (-bfVal / 100)
 
-        if (lrVal < 0) {
-            lVal = lVal + lrVal
 
-            if (Math.abs(lVal) > 1) {
-                if (lVal < 0) {
-                    lVal = -1
-                }
 
-                if (lVal > 1) {
-                    lVal = 1
-                }
-            }
-        }
-
-        if (lrVal > 0) {
-            rVal = rVal - lrVal
-
-            if (Math.abs(rVal) > 1) {
-                if (rVal < 0) {
-                    rVal = -1
-                }
-
-                if (rVal > 1) {
-                    rVal = 1
-                }
-            }
-        }
+        lVal = lVal * speedCoefficient
+        rVal = rVal * speedCoefficient
 
         console.log({l: lVal, r: rVal})
 
@@ -48,8 +29,11 @@ $(document).ready(function () {
 
     }, timeout)
 
-    $('#control-stop').on('click', function (){
-        $('#control-back-forward').val(0);
-        $('#control-left-right').val(0);
-    })
+    bfEl.on('change', function () {
+        bfEl.val(0)
+    });
+
+    lrEl.on('change', function () {
+        lrEl.val(0)
+    });
 })
