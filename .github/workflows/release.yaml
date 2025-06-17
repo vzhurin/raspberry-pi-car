@@ -1,0 +1,22 @@
+on:
+  release:
+    types: [created]
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  release-linux-arm64:
+    name: release linux/arm64
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: wangyoucao577/go-release-action@v1
+        with:
+          project_path: "./cmd/app"
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          goos: linux
+          goarch: arm64
+          extra_files: "./static ./cfg"
+          compress_assets: auto
