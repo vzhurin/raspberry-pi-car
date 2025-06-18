@@ -5,12 +5,11 @@
     text-align: center;
 }
 
-.range-horizontal {
-    width: 300px;
+.range-vertical {
+    writing-mode: vertical-rl;
 }
 
-.range-vertical {
-    width: 250px;
+.range-control {
+    width: 150px;
     height: 300px;
-    writing-mode: vertical-rl;
 }
