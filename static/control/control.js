@@ -10,6 +10,10 @@ $(document).ready(function () {
         let lVal = (Number(lEl.val()) / -100) * speedCoefficient;
         let rVal = (Number(rEl.val()) / -100) * speedCoefficient;
 
+        if (rVal === 0 && lVal === 0) {
+            return
+        }
+
         console.log({l: lVal, r: rVal})
 
         $.ajax("http://"+carHost+":8070/api/move", {
