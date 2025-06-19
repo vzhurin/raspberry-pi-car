@@ -1,5 +1,5 @@
 $(document).ready(function () {
-    let carHost = "192.168.1.35"
+    let carHost = window.location.hostname
     let speedCoefficient = 0.7
     let timeout = 100
 
