@@ -6,7 +6,7 @@
 }
 
 .range-control {
-    width: 100px;
-    height: 370px;
-    writing-mode: vertical-lr;
+    width: 250px;
+    height: 300px;
+    writing-mode: vertical-rl;
 }

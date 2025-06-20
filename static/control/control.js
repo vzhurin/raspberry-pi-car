@@ -1,6 +1,6 @@
 $(document).ready(function () {
     let carHost = window.location.hostname
-    let speedCoefficient = 0.7
+    let speedCoefficient = 1
     let timeout = 100
 
     let lEl = $("#control-left");
