@@ -4,14 +4,15 @@
     <meta charset="utf-8"/>
     <title>Raspberry Pi Car</title>
     <link href="/static/control/control.css" rel="stylesheet"/>
+    <link href="/static/control/slider.css" rel="stylesheet"/>
     <script src="/static/control/jquery-3.7.1.min.js"></script>
     <script src="/static/control/control.js"></script>
 </head>
 <body>
     <div id="container">
         <div>
-            <input type="range" id="control-left" class="range-control range-vertical" min="-100" max="100">
-            <input type="range" id="control-right" class="range-control range-vertical" min="-100" max="100">
+            <input type="range" id="control-left" class="range-control" min="-100" max="100" orient="vertical">
+            <input type="range" id="control-right" class="range-control" min="-100" max="100" orient="vertical">
         </div>
     </div>
 </body>

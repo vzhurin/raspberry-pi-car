@@ -3,13 +3,10 @@
     justify-content: center;
     align-items: center;
     text-align: center;
-}
-
-.range-vertical {
-    writing-mode: vertical-rl;
+    padding-top: 250px;
 }
 
 .range-control {
-    width: 150px;
-    height: 300px;
+    width: 500px !important;
+    transform: rotate(-90deg);
 }
