@@ -3,10 +3,10 @@
     justify-content: center;
     align-items: center;
     text-align: center;
-    padding-top: 250px;
 }
 
 .range-control {
-    width: 500px !important;
-    transform: rotate(-90deg);
+    width: 100px;
+    height: 370px;
+    writing-mode: vertical-lr;
 }
