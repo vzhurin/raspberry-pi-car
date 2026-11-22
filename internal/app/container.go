@@ -3,63 +3,31 @@ package app
 import (
 	"log/slog"
 	"os"
-	"periph.io/x/conn/v3/gpio/gpioreg"
 	"raspberry-pi-car/config"
-	apiHTTP "raspberry-pi-car/internal/api/http"
 	"raspberry-pi-car/internal/chassis"
+	"raspberry-pi-car/internal/joystick"
 	"raspberry-pi-car/internal/periph"
 	"raspberry-pi-car/internal/pwm"
-	"sync"
-	"time"
+
+	"periph.io/x/conn/v3/gpio/gpioreg"
 )
 
 type Container struct {
-	cfg          *config.Config
-	httpServerMu sync.Mutex
-	chassisMu    sync.Mutex
-
-	httpServer  *apiHTTP.Server
-	httpHandler *apiHTTP.Handler
+	cfg *config.Config
 
 	pwmControllerRight *pwm.PWM
 	pwmControllerLeft  *pwm.PWM
 
 	chassis *chassis.Chassis
 
+	watcher  *joystick.Watcher
+	joystick *joystick.Joystick
+
 	logger *slog.Logger
 }
 
 func NewContainer(cfg *config.Config) *Container {
 	return &Container{cfg: cfg}
-}
-
-func (c *Container) HTTPServer() *apiHTTP.Server {
-	c.httpServerMu.Lock()
-	defer c.httpServerMu.Unlock()
-
-	if c.httpServer == nil {
-		httpServer, err := apiHTTP.NewServer(&apiHTTP.Config{
-			Host:    c.cfg.RESTHost,
-			Port:    c.cfg.RESTPort,
-			GinMode: c.cfg.GinMode,
-		}, c.HTTPHandler(), c.Logger())
-
-		if err != nil {
-			panic(err)
-		}
-
-		c.httpServer = httpServer
-	}
-
-	return c.httpServer
-}
-
-func (c *Container) HTTPHandler() *apiHTTP.Handler {
-	if c.httpHandler == nil {
-		c.httpHandler = apiHTTP.NewHandler(c.Chassis(), c.Logger())
-	}
-
-	return c.httpHandler
 }
 
 func (c *Container) PWMControllerRight() *pwm.PWM {
@@ -69,7 +37,7 @@ func (c *Container) PWMControllerRight() *pwm.PWM {
 			panic("failed to find pwm pin right")
 		}
 
-		c.pwmControllerRight = pwm.NewPWM(periph.NewPin(pwmPinRight))
+		c.pwmControllerRight = pwm.New(periph.NewPin(pwmPinRight))
 	}
 
 	return c.pwmControllerRight
@@ -82,16 +50,13 @@ func (c *Container) PWMControllerLeft() *pwm.PWM {
 			panic("failed to find pwm pin left")
 		}
 
-		c.pwmControllerLeft = pwm.NewPWM(periph.NewPin(pwmPinLeft))
+		c.pwmControllerLeft = pwm.New(periph.NewPin(pwmPinLeft))
 	}
 
 	return c.pwmControllerLeft
 }
 
 func (c *Container) Chassis() *chassis.Chassis {
-	c.chassisMu.Lock()
-	defer c.chassisMu.Unlock()
-
 	if c.chassis == nil {
 		controlPinRight1 := gpioreg.ByName(c.cfg.ControlPinRight1)
 		if controlPinRight1 == nil {
@@ -113,7 +78,7 @@ func (c *Container) Chassis() *chassis.Chassis {
 			panic("failed to find left control pin 2")
 		}
 
-		c.chassis = chassis.NewChassis(
+		c.chassis = chassis.New(
 			c.PWMControllerRight(),
 			c.PWMControllerLeft(),
 			periph.NewPin(controlPinRight1),
@@ -121,11 +86,27 @@ func (c *Container) Chassis() *chassis.Chassis {
 			periph.NewPin(controlPinLeft1),
 			periph.NewPin(controlPinLeft2),
 			c.cfg.PWMFrequency,
-			time.Duration(c.cfg.MoveDuration)*time.Millisecond,
+			c.cfg.MoveDuration,
 		)
 	}
 
 	return c.chassis
+}
+
+func (c *Container) Watcher() *joystick.Watcher {
+	if c.watcher == nil {
+		c.watcher = joystick.NewWatcher(
+			c.Joystick,
+			c.Logger().With(slog.String("where", "watcher")),
+			c.cfg.JoystickID,
+		)
+	}
+
+	return c.watcher
+}
+
+func (c *Container) Joystick() (*joystick.Joystick, error) {
+	return joystick.New(c.Chassis(), c.cfg.JoystickID, c.cfg.MoveDuration)
 }
 
 func (c *Container) Logger() *slog.Logger {

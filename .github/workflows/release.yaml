@@ -18,5 +18,5 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           goos: linux
           goarch: arm64
-          extra_files: "./static ./cfg"
+          extra_files: "./cfg"
           compress_assets: auto

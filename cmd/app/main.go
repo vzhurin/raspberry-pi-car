@@ -1,9 +1,10 @@
 package main
 
 import (
-	"periph.io/x/host/v3"
 	"raspberry-pi-car/config"
 	"raspberry-pi-car/internal/app"
+
+	"periph.io/x/host/v3"
 )
 
 func main() {
@@ -17,5 +18,8 @@ func main() {
 		panic(err)
 	}
 
-	app.Run(app.NewContainer(cfg))
+	err = app.Run(app.NewContainer(cfg))
+	if err != nil {
+		panic(err)
+	}
 }

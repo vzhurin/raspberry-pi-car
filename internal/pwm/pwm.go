@@ -1,6 +1,7 @@
 package pwm
 
 import (
+	"context"
 	"errors"
 	"sync"
 	"time"
@@ -11,78 +12,110 @@ type pin interface {
 }
 
 type PWM struct {
-	pin  pin
-	done chan struct{}
-	wg   sync.WaitGroup
+	pin    pin
+	mu     sync.Mutex
+	cancel context.CancelFunc
+	wg     sync.WaitGroup
 }
 
-func NewPWM(pin pin) *PWM {
+func New(pin pin) *PWM {
 	return &PWM{
-		pin:  pin,
-		done: make(chan struct{}),
-		wg:   sync.WaitGroup{},
+		pin: pin,
 	}
 }
 
-func (p *PWM) Start(dutyCycle float64, frequency float64, errChan chan<- error) error {
-	err := p.validate(dutyCycle, frequency)
-	if err != nil {
-		return err
+func (p *PWM) Start(ctx context.Context, dutyCycle float64, freqHz float64) (<-chan error, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	if p.cancel != nil {
+		return nil, errors.New("PWM already started")
 	}
 
-	period := time.Duration(float64(time.Second) / frequency)
+	if err := validateDutyCycle(dutyCycle); err != nil {
+		return nil, err
+	}
+	if err := validateFrequency(freqHz); err != nil {
+		return nil, err
+	}
+
+	period := time.Duration(float64(time.Second) / freqHz)
 	highDuration := time.Duration(float64(period) * dutyCycle)
-	lowDuration := period - highDuration
+
+	ctx, cancel := context.WithCancel(ctx)
+	p.cancel = cancel
+
+	errChan := make(chan error, 1)
 
 	p.wg.Add(1)
-	go p.work(highDuration, lowDuration, errChan)
+	go p.work(ctx, period, highDuration, errChan)
 
-	return nil
+	return errChan, nil
 }
 
 func (p *PWM) Stop() {
-	p.done <- struct{}{}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	if p.cancel == nil {
+		return
+	}
+
+	p.cancel()
 	p.wg.Wait()
+	p.cancel = nil
 }
 
-func (p *PWM) work(highDuration, lowDuration time.Duration, errChan chan<- error) {
+func (p *PWM) work(ctx context.Context, period, highDuration time.Duration, errChan chan<- error) {
 	defer func() {
 		_ = p.pin.Out(false)
 		p.wg.Done()
 	}()
 
+	ticker := time.NewTicker(period)
+	defer ticker.Stop()
+
 	for {
-		err := p.pin.Out(true)
-		if err != nil {
-			errChan <- err
-
-			return
-		}
-		time.Sleep(highDuration)
-
-		err = p.pin.Out(false)
-		if err != nil {
-			errChan <- err
-
-			return
-		}
-		time.Sleep(lowDuration)
-
 		select {
-		case <-p.done:
+		case <-ticker.C:
+			if highDuration > 0 {
+				if err := p.pin.Out(true); err != nil {
+					errChan <- err
+					return
+				}
+			}
+			if highDuration < period {
+				timer := time.NewTimer(highDuration)
+
+				select {
+				case <-ctx.Done():
+					timer.Stop()
+					return
+				case <-timer.C:
+				}
+
+				if err := p.pin.Out(false); err != nil {
+					errChan <- err
+					return
+				}
+			}
+		case <-ctx.Done():
 			return
-		default:
 		}
 	}
 }
 
-func (p *PWM) validate(dutyCycle float64, frequency float64) error {
+func validateDutyCycle(dutyCycle float64) error {
 	if dutyCycle < 0 || dutyCycle > 1 {
-		return errors.New("duty cycle must be in the range from 0 to 1 inclusive")
+		return errors.New("invalid duty cycle")
 	}
 
+	return nil
+}
+
+func validateFrequency(frequency float64) error {
 	if frequency <= 0 {
-		return errors.New("frequency must be greater than zero")
+		return errors.New("invalid frequency")
 	}
 
 	return nil
