@@ -49,7 +49,7 @@ func New(
 		logger:     logger,
 		pollPeriod: pollPeriod,
 		done:       make(chan struct{}),
-		errNotify:  make(chan error),
+		errNotify:  make(chan error, 1),
 	}, nil
 }
 
