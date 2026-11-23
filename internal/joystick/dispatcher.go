@@ -27,7 +27,7 @@ func NewDispatcher(logger *slog.Logger, factory joystickFactory, bus <-chan Even
 		factory:   factory,
 		bus:       bus,
 		done:      make(chan struct{}),
-		errNotify: make(chan error),
+		errNotify: make(chan error, 1),
 	}
 }
 
@@ -78,12 +78,12 @@ func (d *Dispatcher) dispatch(ctx context.Context) error {
 			case *Plugged:
 				d.logger.Debug("dispatching plugged event")
 				if err := d.onPlugged(ctx, e); err != nil {
-					d.errNotify <- err
+					return err
 				}
 			case *Unplugged:
+				d.logger.Warn("dispatching unplugged event")
 				if err := d.onUnplugged(e); err != nil {
-					d.logger.Warn("dispatching unplugged event")
-					d.errNotify <- err
+					return err
 				}
 			default:
 				d.logger.Warn("unknown event")

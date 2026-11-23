@@ -11,12 +11,15 @@ import (
 func Run(c *Container) error {
 	logger := c.Logger().With(slog.String("where", "app"))
 
-	ctx := context.Background()
-	c.Watcher().Watch(ctx)
-	c.Dispatcher().Dispatch(ctx)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
+	defer signal.Stop(quit)
+
+	c.Watcher().Watch(ctx)
+	c.Dispatcher().Dispatch(ctx)
 
 	select {
 	case <-quit:
@@ -28,6 +31,7 @@ func Run(c *Container) error {
 	}
 
 	logger.Info("shutting down")
+	cancel()
 	c.Watcher().Shutdown()
 	c.Dispatcher().Shutdown()
 

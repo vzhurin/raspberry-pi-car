@@ -69,7 +69,9 @@ func (w *Watcher) watch(ctx context.Context) error {
 	}
 
 	if filesystem.FileExists(fmt.Sprintf("%s/%s", path, deviceName)) {
-		w.bus <- NewPlugged(w.joystickID)
+		if !w.publish(ctx, NewPlugged(w.joystickID), 0) {
+			return ctx.Err()
+		}
 		w.logger.Debug("joystick already plugged", slog.Int("ID", w.joystickID))
 	}
 
@@ -89,15 +91,17 @@ func (w *Watcher) watch(ctx context.Context) error {
 			}
 
 			if event.Has(fsnotify.Create) {
-				time.Sleep(watcherDelay)
-				w.bus <- NewPlugged(w.joystickID)
+				if !w.publish(ctx, NewPlugged(w.joystickID), watcherDelay) {
+					return ctx.Err()
+				}
 				w.logger.Debug("joystick has been plugged", slog.Int("ID", w.joystickID))
 				continue
 			}
 
 			if event.Has(fsnotify.Remove) {
-				time.Sleep(watcherDelay)
-				w.bus <- NewUnplugged(w.joystickID)
+				if !w.publish(ctx, NewUnplugged(w.joystickID), watcherDelay) {
+					return ctx.Err()
+				}
 				w.logger.Debug("joystick has been unplugged", slog.Int("ID", w.joystickID))
 				continue
 			}
@@ -109,6 +113,30 @@ func (w *Watcher) watch(ctx context.Context) error {
 
 			w.logger.Error("error watching directory", slog.Any("error", err))
 		}
+	}
+}
+
+func (w *Watcher) publish(ctx context.Context, event Event, delay time.Duration) bool {
+	if delay > 0 {
+		timer := time.NewTimer(delay)
+		defer timer.Stop()
+
+		select {
+		case <-w.done:
+			return false
+		case <-ctx.Done():
+			return false
+		case <-timer.C:
+		}
+	}
+
+	select {
+	case <-w.done:
+		return false
+	case <-ctx.Done():
+		return false
+	case w.bus <- event:
+		return true
 	}
 }
 
