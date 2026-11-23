@@ -20,8 +20,9 @@ type Container struct {
 
 	chassis *chassis.Chassis
 
-	watcher  *joystick.Watcher
-	joystick *joystick.Joystick
+	watcher    *joystick.Watcher
+	dispatcher *joystick.Dispatcher
+	joystick   *joystick.Joystick
 
 	logger *slog.Logger
 }
@@ -96,8 +97,8 @@ func (c *Container) Chassis() *chassis.Chassis {
 func (c *Container) Watcher() *joystick.Watcher {
 	if c.watcher == nil {
 		c.watcher = joystick.NewWatcher(
-			c.Joystick,
 			c.Logger().With(slog.String("where", "watcher")),
+			make(chan joystick.Event, 1),
 			c.cfg.JoystickID,
 		)
 	}
@@ -105,13 +106,32 @@ func (c *Container) Watcher() *joystick.Watcher {
 	return c.watcher
 }
 
-func (c *Container) Joystick() (*joystick.Joystick, error) {
-	return joystick.New(c.Chassis(), c.cfg.JoystickID, c.cfg.MoveDuration)
+func (c *Container) Dispatcher() *joystick.Dispatcher {
+	if c.dispatcher == nil {
+		c.dispatcher = joystick.NewDispatcher(
+			c.Logger().With(slog.String("where", "dispatcher")),
+			c.Joystick,
+			c.Watcher().Bus(),
+		)
+	}
+
+	return c.dispatcher
+}
+
+func (c *Container) Joystick(joystickID int) (*joystick.Joystick, error) {
+	return joystick.New(
+		c.Chassis(),
+		c.Logger().With(slog.String("where", "joystick")),
+		joystickID,
+		c.cfg.MoveDuration,
+	)
 }
 
 func (c *Container) Logger() *slog.Logger {
 	if c.logger == nil {
-		c.logger = slog.New(slog.NewJSONHandler(os.Stdout, nil))
+		c.logger = slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+			Level: slog.LevelDebug,
+		}))
 	}
 
 	return c.logger

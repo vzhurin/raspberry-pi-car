@@ -11,7 +11,9 @@ import (
 func Run(c *Container) error {
 	logger := c.Logger().With(slog.String("where", "app"))
 
-	c.Watcher().Watch(context.Background())
+	ctx := context.Background()
+	c.Watcher().Watch(ctx)
+	c.Dispatcher().Dispatch(ctx)
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
@@ -21,10 +23,13 @@ func Run(c *Container) error {
 		logger.Info("shutdown signal received")
 	case err := <-c.Watcher().ErrNotify():
 		logger.Error("watcher error", slog.Any("error", err))
+	case err := <-c.Dispatcher().ErrNotify():
+		logger.Error("dispatcher error", slog.Any("error", err))
 	}
 
 	logger.Info("shutting down")
 	c.Watcher().Shutdown()
+	c.Dispatcher().Shutdown()
 
 	return nil
 }

@@ -3,8 +3,10 @@ package joystick
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"path/filepath"
+	"raspberry-pi-car/internal/filesystem"
 	"strconv"
 	"sync"
 	"time"
@@ -12,91 +14,71 @@ import (
 	"github.com/fsnotify/fsnotify"
 )
 
-const delay = 1000 * time.Millisecond
+const watcherDelay = 500 * time.Millisecond
 
 type Watcher struct {
-	joystickFactory func() (*Joystick, error)
-	logger          *slog.Logger
-	joystickID      int
-	wg              sync.WaitGroup
-	done            chan struct{}
-	errNotify       chan error
+	logger     *slog.Logger
+	bus        chan Event
+	joystickID int
+	wg         sync.WaitGroup
+	done       chan struct{}
+	errNotify  chan error
 }
 
 func NewWatcher(
-	joystickFactory func() (*Joystick, error),
 	logger *slog.Logger,
+	bus chan Event,
 	joystickID int,
 ) *Watcher {
 	return &Watcher{
-		joystickFactory: joystickFactory,
-		logger:          logger,
-		joystickID:      joystickID,
-		done:            make(chan struct{}),
-		errNotify:       make(chan error, 1),
+		logger:     logger,
+		bus:        bus,
+		joystickID: joystickID,
+		done:       make(chan struct{}),
+		errNotify:  make(chan error, 1),
 	}
 }
 
 func (w *Watcher) Watch(ctx context.Context) {
-	w.wg.Add(1)
-	go func() {
-		defer w.wg.Done()
+	w.wg.Go(func() {
 		defer close(w.errNotify)
 		w.errNotify <- w.watch(ctx)
-	}()
+	})
 }
 
 func (w *Watcher) ErrNotify() <-chan error {
 	return w.errNotify
 }
 
+func (w *Watcher) Bus() <-chan Event {
+	return w.bus
+}
+
 func (w *Watcher) watch(ctx context.Context) error {
+	path := "/dev/input"
+	deviceName := "js" + strconv.Itoa(w.joystickID)
+
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		return err
 	}
 	defer func() { _ = watcher.Close() }()
 
-	if err := watcher.Add("/dev/input"); err != nil {
+	if err := watcher.Add(path); err != nil {
 		return err
 	}
 
-	deviceName := "js" + strconv.Itoa(w.joystickID)
-
-	var current *Joystick
-	var joystickResult <-chan error
-
-	stopJoystick := func() {
-		if current != nil {
-			current.Shutdown()
-			current = nil
-		}
-
-		joystickResult = nil
+	if filesystem.FileExists(fmt.Sprintf("%s/%s", path, deviceName)) {
+		w.bus <- NewPlugged(w.joystickID)
+		w.logger.Debug("joystick already plugged", slog.Int("ID", w.joystickID))
 	}
-	defer stopJoystick()
 
 	for {
 		select {
 		case <-w.done:
 			return nil
-
 		case <-ctx.Done():
 			return ctx.Err()
-
-		case err, ok := <-joystickResult:
-			stopJoystick()
-
-			if !ok || err == nil {
-				continue
-			}
-
-			if errors.Is(err, ErrDriver) {
-				w.logger.With(slog.Any("error", err)).Warn("joystick unavailable; waiting for reconnection")
-				continue
-			}
-
-			return err
 		case event, ok := <-watcher.Events:
 			if !ok {
 				return errors.New("watcher events channel closed")
@@ -106,21 +88,18 @@ func (w *Watcher) watch(ctx context.Context) error {
 				continue
 			}
 
-			if event.Has(fsnotify.Remove) {
-				stopJoystick()
+			if event.Has(fsnotify.Create) {
+				time.Sleep(watcherDelay)
+				w.bus <- NewPlugged(w.joystickID)
+				w.logger.Debug("joystick has been plugged", slog.Int("ID", w.joystickID))
+				continue
 			}
 
-			if event.Has(fsnotify.Create) && current == nil {
-				time.Sleep(delay)
-
-				next, err := w.joystickFactory()
-				if err != nil {
-					return err
-				}
-
-				current = next
-				current.Run(ctx)
-				joystickResult = current.ErrNotify()
+			if event.Has(fsnotify.Remove) {
+				time.Sleep(watcherDelay)
+				w.bus <- NewUnplugged(w.joystickID)
+				w.logger.Debug("joystick has been unplugged", slog.Int("ID", w.joystickID))
+				continue
 			}
 
 		case err, ok := <-watcher.Errors:
@@ -128,15 +107,13 @@ func (w *Watcher) watch(ctx context.Context) error {
 				return errors.New("watcher errors channel closed")
 			}
 
-			w.logger.Error(
-				"error watching directory",
-				slog.Any("error", err),
-			)
+			w.logger.Error("error watching directory", slog.Any("error", err))
 		}
 	}
 }
 
 func (w *Watcher) Shutdown() {
+	w.logger.Info("shutting down watcher")
 	close(w.done)
 	w.wg.Wait()
 }
