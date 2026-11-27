@@ -1,13 +1,10 @@
-package joystick
+package hardware
 
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log/slog"
-	"path/filepath"
 	"raspberry-pi-car/internal/filesystem"
-	"strconv"
 	"sync"
 	"time"
 
@@ -17,25 +14,24 @@ import (
 const watcherDelay = 500 * time.Millisecond
 
 type Watcher struct {
-	logger     *slog.Logger
-	bus        chan Event
-	joystickID int
-	wg         sync.WaitGroup
-	done       chan struct{}
-	errNotify  chan error
+	logger    *slog.Logger
+	device    string
+	bus       chan Event
+	done      chan struct{}
+	errNotify chan error
+	wg        sync.WaitGroup
 }
 
 func NewWatcher(
 	logger *slog.Logger,
-	bus chan Event,
-	joystickID int,
+	device string,
 ) *Watcher {
 	return &Watcher{
-		logger:     logger,
-		bus:        bus,
-		joystickID: joystickID,
-		done:       make(chan struct{}),
-		errNotify:  make(chan error, 1),
+		logger:    logger,
+		device:    device,
+		bus:       make(chan Event),
+		done:      make(chan struct{}),
+		errNotify: make(chan error, 1),
 	}
 }
 
@@ -55,24 +51,23 @@ func (w *Watcher) Bus() <-chan Event {
 }
 
 func (w *Watcher) watch(ctx context.Context) error {
-	path := "/dev/input"
-	deviceName := "js" + strconv.Itoa(w.joystickID)
-
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		return err
 	}
 	defer func() { _ = watcher.Close() }()
 
+	path := CutDevice(w.device)
 	if err := watcher.Add(path); err != nil {
 		return err
 	}
+	w.logger.Debug("start watching", slog.String("path", path))
 
-	if filesystem.FileExists(fmt.Sprintf("%s/%s", path, deviceName)) {
-		if !w.publish(ctx, NewPlugged(w.joystickID), 0) {
+	if filesystem.FileExists(w.device) {
+		if !w.publish(ctx, NewPlugged(w.device), watcherDelay) {
 			return ctx.Err()
 		}
-		w.logger.Debug("joystick already plugged", slog.Int("ID", w.joystickID))
+		w.logger.Debug("device already plugged", slog.String("device", w.device))
 	}
 
 	for {
@@ -86,23 +81,23 @@ func (w *Watcher) watch(ctx context.Context) error {
 				return errors.New("watcher events channel closed")
 			}
 
-			if filepath.Base(event.Name) != deviceName {
+			if event.Name != w.device {
 				continue
 			}
 
 			if event.Has(fsnotify.Create) {
-				if !w.publish(ctx, NewPlugged(w.joystickID), watcherDelay) {
+				if !w.publish(ctx, NewPlugged(w.device), watcherDelay) {
 					return ctx.Err()
 				}
-				w.logger.Debug("joystick has been plugged", slog.Int("ID", w.joystickID))
+				w.logger.Debug("device has been plugged", slog.String("device", w.device))
 				continue
 			}
 
 			if event.Has(fsnotify.Remove) {
-				if !w.publish(ctx, NewUnplugged(w.joystickID), watcherDelay) {
+				if !w.publish(ctx, NewUnplugged(w.device), watcherDelay) {
 					return ctx.Err()
 				}
-				w.logger.Debug("joystick has been unplugged", slog.Int("ID", w.joystickID))
+				w.logger.Debug("device has been unplugged", slog.String("device", w.device))
 				continue
 			}
 
@@ -141,7 +136,7 @@ func (w *Watcher) publish(ctx context.Context, event Event, delay time.Duration)
 }
 
 func (w *Watcher) Shutdown() {
-	w.logger.Info("shutting down watcher")
+	w.logger.Info("shutting down")
 	close(w.done)
 	w.wg.Wait()
 }

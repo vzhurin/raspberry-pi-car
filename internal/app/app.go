@@ -19,21 +19,25 @@ func Run(c *Container) error {
 	defer signal.Stop(quit)
 
 	c.Watcher().Watch(ctx)
-	c.Dispatcher().Dispatch(ctx)
+	c.JoystickDispatcher().Dispatch(ctx)
+	c.JoystickListener().Run(ctx)
 
 	select {
 	case <-quit:
 		logger.Info("shutdown signal received")
 	case err := <-c.Watcher().ErrNotify():
 		logger.Error("watcher error", slog.Any("error", err))
-	case err := <-c.Dispatcher().ErrNotify():
+	case err := <-c.JoystickDispatcher().ErrNotify():
 		logger.Error("dispatcher error", slog.Any("error", err))
+	case err := <-c.JoystickListener().ErrNotify():
+		logger.Error("listener error", slog.Any("error", err))
 	}
 
 	logger.Info("shutting down")
 	cancel()
 	c.Watcher().Shutdown()
-	c.Dispatcher().Shutdown()
+	c.JoystickDispatcher().Shutdown()
+	c.JoystickListener().Shutdown()
 
 	return nil
 }

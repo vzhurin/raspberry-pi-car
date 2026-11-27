@@ -18,7 +18,7 @@ type Config struct {
 	PWMFrequency float64       `mapstructure:"pwm_frequency"`
 	MoveDuration time.Duration `mapstructure:"move_duration"`
 
-	JoystickID int `mapstructure:"joystick_id"`
+	Joystick string `mapstructure:"joystick"`
 }
 
 func Init() (*Config, error) {

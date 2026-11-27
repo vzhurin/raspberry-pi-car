@@ -1,4 +1,4 @@
-package periph
+package pin
 
 import (
 	"periph.io/x/conn/v3/gpio"

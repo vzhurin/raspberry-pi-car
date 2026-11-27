@@ -5,8 +5,10 @@ import (
 	"os"
 	"raspberry-pi-car/config"
 	"raspberry-pi-car/internal/chassis"
+	"raspberry-pi-car/internal/hardware"
 	"raspberry-pi-car/internal/joystick"
-	"raspberry-pi-car/internal/periph"
+	"raspberry-pi-car/internal/joystick/0xcafed00d"
+	"raspberry-pi-car/internal/pin"
 	"raspberry-pi-car/internal/pwm"
 
 	"periph.io/x/conn/v3/gpio/gpioreg"
@@ -20,9 +22,10 @@ type Container struct {
 
 	chassis *chassis.Chassis
 
-	watcher    *joystick.Watcher
-	dispatcher *joystick.Dispatcher
-	joystick   *joystick.Joystick
+	watcher *hardware.Watcher
+
+	joystickDispatcher *joystick.Dispatcher
+	joystickListener   *joystick.Listener
 
 	logger *slog.Logger
 }
@@ -38,7 +41,7 @@ func (c *Container) PWMControllerRight() *pwm.PWM {
 			panic("failed to find pwm pin right")
 		}
 
-		c.pwmControllerRight = pwm.New(periph.NewPin(pwmPinRight))
+		c.pwmControllerRight = pwm.New(pin.NewPin(pwmPinRight))
 	}
 
 	return c.pwmControllerRight
@@ -51,7 +54,7 @@ func (c *Container) PWMControllerLeft() *pwm.PWM {
 			panic("failed to find pwm pin left")
 		}
 
-		c.pwmControllerLeft = pwm.New(periph.NewPin(pwmPinLeft))
+		c.pwmControllerLeft = pwm.New(pin.NewPin(pwmPinLeft))
 	}
 
 	return c.pwmControllerLeft
@@ -82,10 +85,10 @@ func (c *Container) Chassis() *chassis.Chassis {
 		c.chassis = chassis.New(
 			c.PWMControllerRight(),
 			c.PWMControllerLeft(),
-			periph.NewPin(controlPinRight1),
-			periph.NewPin(controlPinRight2),
-			periph.NewPin(controlPinLeft1),
-			periph.NewPin(controlPinLeft2),
+			pin.NewPin(controlPinRight1),
+			pin.NewPin(controlPinRight2),
+			pin.NewPin(controlPinLeft1),
+			pin.NewPin(controlPinLeft2),
 			c.cfg.PWMFrequency,
 			c.cfg.MoveDuration,
 		)
@@ -94,35 +97,50 @@ func (c *Container) Chassis() *chassis.Chassis {
 	return c.chassis
 }
 
-func (c *Container) Watcher() *joystick.Watcher {
+func (c *Container) Watcher() *hardware.Watcher {
 	if c.watcher == nil {
-		c.watcher = joystick.NewWatcher(
+		c.watcher = hardware.NewWatcher(
 			c.Logger().With(slog.String("where", "watcher")),
-			make(chan joystick.Event, 1),
-			c.cfg.JoystickID,
+			c.cfg.Joystick,
 		)
 	}
 
 	return c.watcher
 }
 
-func (c *Container) Dispatcher() *joystick.Dispatcher {
-	if c.dispatcher == nil {
-		c.dispatcher = joystick.NewDispatcher(
+func (c *Container) JoystickDispatcher() *joystick.Dispatcher {
+	if c.joystickDispatcher == nil {
+		c.joystickDispatcher = joystick.NewDispatcher(
 			c.Logger().With(slog.String("where", "dispatcher")),
-			c.Joystick,
+			c.Joystick0xcafed00d,
 			c.Watcher().Bus(),
 		)
 	}
 
-	return c.dispatcher
+	return c.joystickDispatcher
 }
 
-func (c *Container) Joystick(joystickID int) (*joystick.Joystick, error) {
-	return joystick.New(
-		c.Chassis(),
+func (c *Container) JoystickListener() *joystick.Listener {
+	if c.joystickListener == nil {
+		c.joystickListener = joystick.NewListener(
+			c.Chassis(),
+			c.Logger().With(slog.String("where", "listener")),
+			c.JoystickDispatcher().StateBus(),
+		)
+	}
+
+	return c.joystickListener
+}
+
+func (c *Container) Joystick0xcafed00d(device string) (joystick.Joystick, error) {
+	number, err := hardware.DeviceNumber(device)
+	if err != nil {
+		return nil, err
+	}
+
+	return _0xcafed00d.New(
 		c.Logger().With(slog.String("where", "joystick")),
-		joystickID,
+		number,
 		c.cfg.MoveDuration,
 	)
 }
