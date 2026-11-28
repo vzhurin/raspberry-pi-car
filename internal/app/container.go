@@ -8,6 +8,7 @@ import (
 	"raspberry-pi-car/internal/hardware"
 	"raspberry-pi-car/internal/joystick"
 	"raspberry-pi-car/internal/joystick/0xcafed00d"
+	goSDL3 "raspberry-pi-car/internal/joystick/go-sdl3"
 	"raspberry-pi-car/internal/pin"
 	"raspberry-pi-car/internal/pwm"
 
@@ -112,7 +113,7 @@ func (c *Container) JoystickDispatcher() *joystick.Dispatcher {
 	if c.joystickDispatcher == nil {
 		c.joystickDispatcher = joystick.NewDispatcher(
 			c.Logger().With(slog.String("where", "dispatcher")),
-			c.Joystick0xcafed00d,
+			c.JoystickGoSDL3,
 			c.Watcher().Bus(),
 		)
 	}
@@ -133,14 +134,27 @@ func (c *Container) JoystickListener() *joystick.Listener {
 }
 
 func (c *Container) Joystick0xcafed00d(device string) (joystick.Joystick, error) {
-	number, err := hardware.DeviceNumber(device)
+	id, err := hardware.DeviceID(device)
 	if err != nil {
 		return nil, err
 	}
 
 	return _0xcafed00d.New(
-		c.Logger().With(slog.String("where", "joystick")),
-		number,
+		c.Logger().With(slog.String("where", "joystick 0xcafed00d")),
+		id,
+		c.cfg.MoveDuration,
+	)
+}
+
+func (c *Container) JoystickGoSDL3(device string) (joystick.Joystick, error) {
+	id, err := hardware.DeviceID(device)
+	if err != nil {
+		return nil, err
+	}
+
+	return goSDL3.New(
+		c.Logger().With(slog.String("where", "joystick go SDL3")),
+		id,
 		c.cfg.MoveDuration,
 	)
 }

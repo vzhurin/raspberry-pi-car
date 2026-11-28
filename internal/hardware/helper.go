@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-func DeviceNumber(path string) (int, error) {
+func DeviceID(path string) (int, error) {
 	base := filepath.Base(path)
 	i := len(base)
 	for i > 0 && base[i-1] >= '0' && base[i-1] <= '9' {
@@ -15,7 +15,7 @@ func DeviceNumber(path string) (int, error) {
 	}
 
 	if i == len(base) {
-		return -1, fmt.Errorf("path %q does not contain device number", path)
+		return -1, fmt.Errorf("path %q does not contain device ID", path)
 	}
 
 	return strconv.Atoi(base[i:])

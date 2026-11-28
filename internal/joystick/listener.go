@@ -60,7 +60,7 @@ func (l *Listener) run(ctx context.Context) error {
 			l.logger.Debug("done channel closed")
 			return nil
 		case s := <-l.bus:
-			err := l.mover.Move(ctx, s.LeftGas, s.RightGas)
+			err := l.mover.Move(ctx, -s.LeftGas, -s.RightGas)
 			if err != nil {
 				return err
 			}

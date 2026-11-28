@@ -1,9 +1,10 @@
 module raspberry-pi-car
 
-go 1.25.0
+go 1.26.5
 
 require (
 	github.com/0xcafed00d/joystick v1.0.1
+	github.com/Zyko0/go-sdl3 v0.1.4
 	github.com/fsnotify/fsnotify v1.8.0
 	github.com/spf13/viper v1.20.1
 	periph.io/x/conn/v3 v3.7.3
@@ -11,6 +12,8 @@ require (
 )
 
 require (
+	github.com/Zyko0/purego-gen v0.0.2 // indirect
+	github.com/ebitengine/purego v0.10.2 // indirect
 	github.com/go-viper/mapstructure/v2 v2.4.0 // indirect
 	github.com/pelletier/go-toml/v2 v2.4.3 // indirect
 	github.com/sagikazarmark/locafero v0.7.0 // indirect
@@ -21,7 +24,7 @@ require (
 	github.com/subosito/gotenv v1.6.0 // indirect
 	go.uber.org/atomic v1.9.0 // indirect
 	go.uber.org/multierr v1.9.0 // indirect
-	golang.org/x/sys v0.44.0 // indirect
+	golang.org/x/sys v0.48.0 // indirect
 	golang.org/x/text v0.41.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

@@ -6,9 +6,19 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+
+	"github.com/Zyko0/go-sdl3/bin/binsdl"
+	"github.com/Zyko0/go-sdl3/sdl"
 )
 
 func Run(c *Container) error {
+	defer binsdl.Load().Unload()
+	defer sdl.Quit()
+	err := sdl.Init(sdl.INIT_GAMEPAD)
+	if err != nil {
+		return err
+	}
+
 	logger := c.Logger().With(slog.String("where", "app"))
 
 	ctx, cancel := context.WithCancel(context.Background())

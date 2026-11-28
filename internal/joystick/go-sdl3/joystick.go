@@ -1,24 +1,21 @@
-package _0xcafed00d
+package goSDL3
 
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"raspberry-pi-car/internal/joystick"
 	"sync"
 	"time"
 
-	joy "github.com/0xcafed00d/joystick"
+	"github.com/Zyko0/go-sdl3/sdl"
 )
 
-const (
-	axisMax   = 32767
-	rightAxis = 4
-	leftAxis  = 1
-)
+const axisMax = 32767
 
 type Joystick struct {
-	driver     joy.Joystick
+	gamepad    *sdl.Gamepad
 	logger     *slog.Logger
 	bus        chan joystick.State
 	pollPeriod time.Duration
@@ -29,17 +26,30 @@ type Joystick struct {
 
 func New(
 	logger *slog.Logger,
-	joystickID int,
+	gamepadID int,
 	pollPeriod time.Duration,
 ) (*Joystick, error) {
-	driver, err := joy.Open(joystickID)
+	if gamepadID < 0 {
+		return nil, errors.New("invalid gamepad ID")
+	}
+
+	gamepadsIDs, err := sdl.GetGamepads()
+	if err != nil {
+		return nil, err
+	}
+
+	if len(gamepadsIDs) <= gamepadID {
+		return nil, fmt.Errorf("gamepad %d not found", gamepadID)
+	}
+
+	gamepad, err := gamepadsIDs[gamepadID].OpenGamepad()
 	if err != nil {
 		return nil, errors.Join(joystick.ErrDriver, err)
 	}
 
 	return &Joystick{
-		driver:     driver,
 		logger:     logger,
+		gamepad:    gamepad,
 		pollPeriod: pollPeriod,
 		bus:        make(chan joystick.State),
 		done:       make(chan struct{}),
@@ -57,7 +67,7 @@ func (j *Joystick) Run(ctx context.Context) {
 func (j *Joystick) Shutdown() {
 	j.logger.Info("shutting down")
 	close(j.done)
-	j.driver.Close()
+	j.gamepad.Close()
 	j.wg.Wait()
 }
 
@@ -74,23 +84,12 @@ func (j *Joystick) run(ctx context.Context) error {
 	defer ticker.Stop()
 
 	for {
-		select {
-		case <-ctx.Done():
-			j.logger.Debug("context done")
-			return ctx.Err()
-		case <-j.done:
-			j.logger.Debug("done channel closed")
-			return nil
-		case <-ticker.C:
-		}
+		sdl.UpdateGamepads()
 
-		s, err := j.driver.Read()
-		if err != nil {
-			return errors.Join(joystick.ErrDriver, err)
-		}
+		fmt.Println(j.gamepad.Axis(sdl.GAMEPAD_AXIS_RIGHTY))
 
-		right := -float64(s.AxisData[rightAxis]) / axisMax
-		left := -float64(s.AxisData[leftAxis]) / axisMax
+		right := float64(j.gamepad.Axis(sdl.GAMEPAD_AXIS_RIGHTY)) / axisMax
+		left := float64(j.gamepad.Axis(sdl.GAMEPAD_AXIS_LEFTY)) / axisMax
 
 		select {
 		case j.bus <- joystick.State{
@@ -103,6 +102,7 @@ func (j *Joystick) run(ctx context.Context) error {
 		case <-j.done:
 			j.logger.Debug("done channel closed")
 			return nil
+		case <-ticker.C:
 		}
 	}
 }
